@@ -87,7 +87,7 @@ pub fn run_test(
         data_check: None
     };
 
-    println!("{:#?}",&buffer_properties);
+    //println!("{:#?}",&buffer_properties);
 
     match (buffer_properties.is_exportable(),buffer_properties.is_importable(), buffer_properties.get_export_from_imported_memory_types().contains(external_memory_type.into()))
     {
@@ -286,32 +286,72 @@ pub fn run_test(
                 device.free_memory(memory);
             }
         }
+
         (false,true,false)=>{
-            let mut data_in = crate::DataTest::default();
-            let data_size = std::mem::size_of::<crate::DataTest>() as u64;
+            if let hal::external_memory::ExternalMemoryType::Ptr(_) = external_memory_type {}
+            else {return tests;}
+
+            let (buffer, mut memory) = match create_exportable_buffer::<crate::DataTest>(
+                adapter,
+                device,
+                external_memory_type.into(),
+                buffer_usage,
+                buffer_flags,
+            )
+            {
+                Some(buffer_memory)=>{tests.create_exportable_memory = Some(TestResult::Success);buffer_memory}
+                None=>{
+                    tests.create_exportable_memory = Some(TestResult::Failed);
+                    return tests;
+                }
+            };
+
+            let data_in = crate::DataTest::default();
+            write_memory(device,&mut memory,&data_in);
+            let buffer_req = unsafe { device.get_buffer_requirements(&buffer) };
+
             let (imported_buffer, mut imported_memory) = match external_memory_type {
                 #[cfg(any(unix))]
-                hal::external_memory::ExternalMemoryType::Fd(_external_memory_fd_type)=>{
+                hal::external_memory::ExternalMemoryType::Fd(_)=>{
                     unimplemented!();
                 }
                 #[cfg(any(windows))]
-                hal::external_memory::ExternalMemoryType::Handle(_external_memory_handle_type)=>{
+                hal::external_memory::ExternalMemoryType::Handle(_)=>{
                     unimplemented!();
                 }
                 hal::external_memory::ExternalMemoryType::Ptr(external_memory_ptr_type)=>{
-                    let ptr = &mut data_in as *mut crate::DataTest;
-                    let external_memory: hal::external_memory::ExternalMemoryPtr = (external_memory_ptr_type,ptr.into(), data_size).into();
-                    match import_buffer_memory(
-                        adapter,
-                        device,
-                        external_memory.into(),
-                        buffer_usage,
-                        buffer_flags
-                    )
-                    {
-                        Some(buffer_memory)=>{tests.import_memory = Some(TestResult::Success);buffer_memory}
-                        None=>{
-                            tests.import_memory = Some(TestResult::Failed);
+                    match unsafe { device.map_memory(&mut memory, hal::memory::Segment::ALL) } {
+                        Ok(ptr)=>{
+                            tests.export_memory = Some(TestResult::Success);
+                            let external_memory: hal::external_memory::ExternalMemoryPtr = (external_memory_ptr_type,ptr.into(), buffer_req.size).into();
+                            match import_buffer_memory(
+                                adapter,
+                                device,
+                                external_memory.into(),
+                                buffer_usage,
+                                buffer_flags
+                            )
+                            {
+                                Some(buffer_memory)=>{tests.import_memory = Some(TestResult::Success);buffer_memory}
+                                None=>{
+                                    tests.import_memory = Some(TestResult::Failed);
+                                    device.wait_idle().unwrap();
+                                    unsafe {
+                                        device.destroy_buffer(buffer);
+                                        device.free_memory(memory);
+                                    }
+                                    return tests;
+                                }
+                            }
+                        },
+                        Err(_)=>{
+                            //error!("Failed to export buffer as fd: {:#?}",err);
+                            tests.export_memory = Some(TestResult::Failed);
+                            device.wait_idle().unwrap();
+                            unsafe {
+                                device.destroy_buffer(buffer);
+                                device.free_memory(memory);
+                            }
                             return tests;
                         }
                     }
@@ -326,6 +366,11 @@ pub fn run_test(
             unsafe {
                 device.destroy_buffer(imported_buffer);
                 device.free_memory(imported_memory);
+
+                if let hal::external_memory::ExternalMemoryType::Ptr(_) = external_memory_type {device.unmap_memory(&mut memory);}
+
+                device.destroy_buffer(buffer);
+                device.free_memory(memory);
             }
         }
         _=>{}

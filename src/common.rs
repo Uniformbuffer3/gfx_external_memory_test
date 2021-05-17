@@ -95,7 +95,7 @@ pub fn create_exportable_buffer<T>(
     }{
         Ok(memory)=>memory,
         Err(err)=>{
-            println!("{:#?}",err);
+            println!("Failed to `allocate_exportable_memory`:{:#?}",err);
             device.wait_idle().unwrap();
             unsafe {device.destroy_buffer(buffer);}
             return None;
@@ -105,7 +105,7 @@ pub fn create_exportable_buffer<T>(
 
     match unsafe { device.bind_buffer_memory(&memory, 0, &mut buffer) }{
         Ok(_)=>{Some((buffer, memory))}
-        Err(err)=>{println!("{:#?}",err);None}
+        Err(err)=>{println!("Failed to `bind_buffer_memory`:{:#?}",err);None}
     }
 }
 
@@ -145,13 +145,13 @@ pub fn import_buffer_memory(
     let memory_mask = match unsafe { device.get_external_memory_mask(&external_memory) }{
         Ok(memory_mask)=>memory_mask,
         Err(err)=>{
-            println!("{:#?}",err);
+            println!("Failed to `get_external_memory_mask`:{:#?}",err);
             device.wait_idle().unwrap();
             unsafe {device.destroy_buffer(buffer);}
             return None;
         }
     };
-    println!("{:#?}",memory_mask);
+
     let buffer_req = unsafe { device.get_buffer_requirements(&buffer) };
     let memory_type_id = adapter
         .physical_device
@@ -171,8 +171,6 @@ pub fn import_buffer_memory(
         .unwrap()
         .into();
 
-
-    println!("{:#?}",buffer_req);
     let external_memory = match external_memory {
         #[cfg(any(unix))]
         hal::external_memory::ExternalMemory::Fd(external_memory_fd)=>{
@@ -198,7 +196,7 @@ pub fn import_buffer_memory(
     } {
         Ok(memory) => memory,
         Err(err)=>{
-            println!("{:#?}",err);
+            println!("Failed to `import_external_memory`:{:#?}",err);
             device.wait_idle().unwrap();
             unsafe {device.destroy_buffer(buffer);}
             return None;
@@ -207,7 +205,7 @@ pub fn import_buffer_memory(
 
     match unsafe { device.bind_buffer_memory(&memory, 0, &mut buffer) }{
         Ok(_)=>{Some((buffer, memory))}
-        Err(err)=>{println!("{:#?}",err);None}
+        Err(err)=>{println!("Failed to `bind_buffer_memory`:{:#?}",err);None}
     }
 }
 
@@ -216,7 +214,7 @@ pub fn read_memory<T: Default>(device: &gfx_backend_vulkan::Device, memory: &mut
     let mapping =
         match unsafe { device.map_memory(memory, hal::memory::Segment::ALL) } {
             Ok(pointer) => pointer,
-            Err(err) => panic!("{:#?}", err),
+            Err(err) => panic!("Failed to `map_memory`:{:#?}",err),
         };
     let mut data = T::default();
     let data_len = std::mem::size_of::<T>() as u64;
