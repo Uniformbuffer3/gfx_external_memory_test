@@ -10,3 +10,4 @@ edition = "2018"
 gfx-backend-vulkan = {path="../gfx/src/backend/vulkan"}
 gfx-hal = {path="../gfx/src/hal"}
 env_logger = "*"
+log = "*"
