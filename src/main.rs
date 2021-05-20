@@ -154,6 +154,7 @@ pub fn run_test(
         .query_external_buffer_properties(buffer_usage, buffer_flags, external_memory_type.into())
         .unwrap();
 
+    println!("{:#?}",&buffer_properties);
     let mut tests = Tests {
         name: name,
         create_allocate_external_buffer: None,
@@ -183,12 +184,13 @@ pub fn run_test(
     // Buffer allocations
     let data_in = crate::DataTest::default();
     let data_len = std::mem::size_of::<crate::DataTest>() as u64;
-    let limits = adapter.physical_device.properties().limits;
-    let non_coherent_alignment = limits.non_coherent_atom_size as u64;
+    let physical_device_properties = adapter.physical_device.properties();
+    //let non_coherent_alignment = physical_device_properties.limits.non_coherent_atom_size as u64;
+    let host_ptr_alignment = physical_device_properties.external_memory_limits.min_imported_host_pointer_alignment;
 
     assert_ne!(data_len, 0);
     let padded_buffer_len =
-        ((data_len + non_coherent_alignment - 1) / non_coherent_alignment) * non_coherent_alignment;
+        ((data_len + host_ptr_alignment - 1) / host_ptr_alignment) * host_ptr_alignment;
 
     match (
         buffer_properties.is_exportable(),
@@ -268,7 +270,6 @@ pub fn run_test(
                 device.free_memory(memory);
             }
         }
-
         (true, true, true) => {
             let (buffer, mut memory) = match unsafe {
                 device.create_allocate_external_buffer(
@@ -339,7 +340,7 @@ pub fn run_test(
                     buffer_usage,
                     buffer_flags,
                     memory_types.clone(),
-                    data_len,
+                    padded_buffer_len,
                 )
             } {
                 Ok(buffer_memory) => {
@@ -355,7 +356,6 @@ pub fn run_test(
                         external_memory_type == hal::external_memory::ExternalMemoryType::HostMappedForeignMemory {
                             device.unmap_memory(&mut memory);
                         }
-
                         device.destroy_buffer(buffer);
                         device.free_memory(memory);
                     }
@@ -374,18 +374,15 @@ pub fn run_test(
             unsafe {
                 device.destroy_buffer(imported_buffer);
                 device.free_memory(imported_memory);
-
                 if external_memory_type == hal::external_memory::ExternalMemoryType::HostAllocation ||
                 external_memory_type == hal::external_memory::ExternalMemoryType::HostMappedForeignMemory {
                     device.unmap_memory(&mut memory);
                 }
-
                 device.destroy_buffer(buffer);
                 device.free_memory(memory);
             }
         }
-
-        (false, true, false) => {
+        (false,true,false)=>{
             if hal::external_memory::ExternalMemoryType::HostAllocation == external_memory_type
                 || hal::external_memory::ExternalMemoryType::HostMappedForeignMemory
                     == external_memory_type
@@ -416,54 +413,73 @@ pub fn run_test(
 
             write_memory(device, &mut memory, &data_in);
 
-            let (imported_buffer, mut imported_memory) = match external_memory_type {
-                hal::external_memory::ExternalMemoryType::HostAllocation
-                | hal::external_memory::ExternalMemoryType::HostMappedForeignMemory => {
-                    match unsafe { device.map_memory(&mut memory, hal::memory::Segment::ALL) } {
-                        Ok(ptr) => {
-                            tests.export_memory = Some(TestResult::Success);
-
-                            match unsafe {
-                                device.import_external_buffer(
-                                    (external_memory_type, hal::external_memory::Ptr::from(ptr))
-                                        .try_into()
-                                        .unwrap(),
-                                    buffer_usage,
-                                    buffer_flags,
-                                    memory_types.clone(),
-                                    data_len,
-                                )
-                            } {
-                                Ok(buffer_memory) => {
-                                    tests.import_external_buffer = Some(TestResult::Success);
-                                    buffer_memory
-                                }
-                                Err(err) => {
-                                    error!("Error on `import_external_buffer`: {:#?}", err);
-                                    tests.import_external_buffer = Some(TestResult::Failed);
-                                    device.wait_idle().unwrap();
-                                    unsafe {
-                                        device.destroy_buffer(buffer);
-                                        device.free_memory(memory);
-                                    }
-                                    return tests;
-                                }
-                            }
+            let external_memory = if external_memory_type
+                == hal::external_memory::ExternalMemoryType::HostAllocation
+                || external_memory_type
+                    == hal::external_memory::ExternalMemoryType::HostMappedForeignMemory
+            {
+                match unsafe { device.map_memory(&mut memory, hal::memory::Segment::ALL) } {
+                    Ok(external_memory) => {
+                        tests.export_memory = Some(TestResult::Success);
+                        let ptr: hal::external_memory::Ptr = external_memory.into();
+                        (external_memory_type, ptr).try_into().unwrap()
+                    }
+                    Err(err) => {
+                        error!("Error on `export_memory`: {:#?}", err);
+                        tests.export_memory = Some(TestResult::Failed);
+                        device.wait_idle().unwrap();
+                        unsafe {
+                            device.destroy_buffer(buffer);
+                            device.free_memory(memory);
                         }
-                        Err(err) => {
-                            error!("Error on `map_memory`: {:#?}", err);
-                            tests.export_memory = Some(TestResult::Failed);
-                            device.wait_idle().unwrap();
-                            unsafe {
-                                device.destroy_buffer(buffer);
-                                device.free_memory(memory);
-                            }
-                            return tests;
-                        }
+                        return tests;
                     }
                 }
-                _ => {
-                    unimplemented!()
+            } else {
+                match unsafe { device.export_memory(external_memory_type, &memory) } {
+                    Ok(external_memory) => {
+                        tests.export_memory = Some(TestResult::Success);
+                        external_memory
+                    }
+                    Err(err) => {
+                        error!("Error on `export_memory`: {:#?}", err);
+                        tests.export_memory = Some(TestResult::Failed);
+                        device.wait_idle().unwrap();
+                        unsafe {
+                            device.destroy_buffer(buffer);
+                            device.free_memory(memory);
+                        }
+                        return tests;
+                    }
+                }
+            };
+
+            let (imported_buffer, mut imported_memory) = match unsafe {
+                device.import_external_buffer(
+                    external_memory,
+                    buffer_usage,
+                    buffer_flags,
+                    memory_types.clone(),
+                    padded_buffer_len,
+                )
+            } {
+                Ok(buffer_memory) => {
+                    tests.import_external_buffer = Some(TestResult::Success);
+                    buffer_memory
+                }
+                Err(err) => {
+                    error!("Error on `import_external_buffer`: {:#?}", err);
+                    tests.import_external_buffer = Some(TestResult::Failed);
+                    device.wait_idle().unwrap();
+                    unsafe {
+                        if external_memory_type == hal::external_memory::ExternalMemoryType::HostAllocation ||
+                        external_memory_type == hal::external_memory::ExternalMemoryType::HostMappedForeignMemory {
+                            device.unmap_memory(&mut memory);
+                        }
+                        device.destroy_buffer(buffer);
+                        device.free_memory(memory);
+                    }
+                    return tests;
                 }
             };
 
@@ -478,17 +494,14 @@ pub fn run_test(
             unsafe {
                 device.destroy_buffer(imported_buffer);
                 device.free_memory(imported_memory);
-
-                if hal::external_memory::ExternalMemoryType::HostAllocation == external_memory_type
-                    || hal::external_memory::ExternalMemoryType::HostMappedForeignMemory
-                        == external_memory_type
-                {
+                if external_memory_type == hal::external_memory::ExternalMemoryType::HostAllocation ||
+                external_memory_type == hal::external_memory::ExternalMemoryType::HostMappedForeignMemory {
                     device.unmap_memory(&mut memory);
                 }
-
                 device.destroy_buffer(buffer);
                 device.free_memory(memory);
             }
+
         }
         _ => {}
     }
