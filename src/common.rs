@@ -1,6 +1,27 @@
 use gfx_hal as hal;
 use hal::device::Device;
 
+pub const width: u32 = 1024;
+pub const height: u32 = 768;
+
+pub enum Parameters {
+    Image{
+        //data: Vec<u8>,
+        kind: hal::image::Kind,
+        mip_levels: hal::image::Level,
+        format: hal::format::Format,
+        tiling: hal::image::Tiling,
+        usage: hal::image::Usage,
+        sparse: hal::memory::SparseFlags,
+        view_caps: hal::image::ViewCapabilities,
+    },
+    Buffer{
+        //data: Vec<u8>,
+        buffer_usage: hal::buffer::Usage,
+        buffer_flags: hal::memory::SparseFlags
+    }
+}
+
 pub fn read_memory<T: Default>(
     device: &gfx_backend_vulkan::Device,
     memory: &mut <gfx_backend_vulkan::Backend as gfx_hal::Backend>::Memory,
