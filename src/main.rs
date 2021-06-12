@@ -3,15 +3,19 @@ mod init_device;
 mod common;
 pub use common::*;
 
+
 use log::*;
 
 use gfx_hal as hal;
 use hal::adapter::{Adapter, PhysicalDevice};
 use hal::device::Device;
 use hal::Instance;
-use hal::external_memory::Resource;
 use hal::format::AsFormat;
 use std::convert::TryInto;
+use hal::external_memory::*;
+
+const WIDTH: u32 = 800;
+const HEIGHT: u32 = 600;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 #[allow(non_snake_case)]
@@ -125,8 +129,8 @@ pub fn run_tests(
                 "OPAQUE_FD".into(),
                 adapter,
                 device,
-                hal::external_memory::ExternalMemoryType::OpaqueFd.into(),
                 Parameters::Buffer {
+                    external_memory_type: hal::external_memory::ExternalBufferMemoryType::OpaqueFd,
                     buffer_usage: hal::buffer::Usage::VERTEX,
                     buffer_flags: hal::memory::SparseFlags::empty()
                 }
@@ -138,8 +142,8 @@ pub fn run_tests(
                 "DMA_BUF".into(),
                 adapter,
                 device,
-                hal::external_memory::ExternalMemoryType::DmaBuf.into(),
                 Parameters::Buffer {
+                    external_memory_type: hal::external_memory::ExternalBufferMemoryType::DmaBuf,
                     buffer_usage: hal::buffer::Usage::VERTEX,
                     buffer_flags: hal::memory::SparseFlags::empty()
                 }
@@ -153,11 +157,11 @@ pub fn run_tests(
             "HOST_ALLOCATION".into(),
             adapter,
             device,
-            hal::external_memory::ExternalMemoryType::HostAllocation.into(),
-                Parameters::Buffer {
-                    buffer_usage: hal::buffer::Usage::VERTEX,
-                    buffer_flags: hal::memory::SparseFlags::empty()
-                }
+            Parameters::Buffer {
+                external_memory_type: hal::external_memory::ExternalBufferMemoryType::HostAllocation,
+                buffer_usage: hal::buffer::Usage::VERTEX,
+                buffer_flags: hal::memory::SparseFlags::empty()
+            }
         )
     );
 
@@ -167,11 +171,11 @@ pub fn run_tests(
             "HOST_MAPPED_FOREIGN_MEMORY".into(),
             adapter,
             device,
-            hal::external_memory::ExternalMemoryType::HostMappedForeignMemory.into(),
-                Parameters::Buffer {
-                    buffer_usage: hal::buffer::Usage::VERTEX,
-                    buffer_flags: hal::memory::SparseFlags::empty()
-                }
+            Parameters::Buffer {
+                external_memory_type: hal::external_memory::ExternalBufferMemoryType::HostMappedForeignMemory,
+                buffer_usage: hal::buffer::Usage::VERTEX,
+                buffer_flags: hal::memory::SparseFlags::empty()
+            }
         )
     );
 
@@ -185,9 +189,9 @@ pub fn run_tests(
                 "OPAQUE_FD".into(),
                 adapter,
                 device,
-                hal::external_memory::ExternalMemoryType::OpaqueFd.into(),
                 Parameters::Image {
-                    kind: hal::image::Kind::D2(width as hal::image::Size, height as hal::image::Size, 1, 1),
+                    external_memory_type: hal::external_memory::ExternalImageMemoryType::OpaqueFd,
+                    kind: hal::image::Kind::D2(WIDTH as hal::image::Size, HEIGHT as hal::image::Size, 1, 1),
                     mip_levels: 1,
                     format: hal::format::Rgba8Srgb::SELF,
                     tiling: hal::image::Tiling::Linear,
@@ -203,8 +207,30 @@ pub fn run_tests(
                 "DMA_BUF".into(),
                 adapter,
                 device,
-                hal::external_memory::ExternalMemoryType::DmaBuf.into(),
                 Parameters::Image {
+                    external_memory_type: hal::external_memory::ExternalImageMemoryType::DmaBuf(Vec::new()),
+                    kind: hal::image::Kind::D2(WIDTH as hal::image::Size, HEIGHT as hal::image::Size, 1, 1),
+                    mip_levels: 1,
+                    format: hal::format::Rgba8Srgb::SELF,
+                    tiling: hal::image::Tiling::Linear,
+                    usage: hal::image::Usage::TRANSFER_DST | hal::image::Usage::SAMPLED,
+                    sparse: hal::memory::SparseFlags::empty(),
+                    view_caps: hal::image::ViewCapabilities::empty(),
+                }
+            )
+        );
+
+        /*
+        let format_properties = adapter.physical_device.format_properties(Some(hal::format::Rgba8Srgb::SELF));
+        println!("{:#?}",format_properties);
+        println!(
+            "{:#?}",
+            run_test(
+                "DMA_BUF".into(),
+                adapter,
+                device,
+                Parameters::Image {
+                    external_memory_type: hal::external_memory::ExternalImageMemoryType::DmaBuf(Vec::new()),
                     kind: hal::image::Kind::D2(width as hal::image::Size, height as hal::image::Size, 1, 1),
                     mip_levels: 1,
                     format: hal::format::Rgba8Srgb::SELF,
@@ -215,6 +241,7 @@ pub fn run_tests(
                 }
             )
         );
+        */
     }
 
     println!(
@@ -223,9 +250,9 @@ pub fn run_tests(
             "HOST_ALLOCATION".into(),
             adapter,
             device,
-            hal::external_memory::ExternalMemoryType::HostAllocation.into(),
             Parameters::Image {
-                kind: hal::image::Kind::D2(width as hal::image::Size, height as hal::image::Size, 1, 1),
+                external_memory_type: hal::external_memory::ExternalImageMemoryType::HostAllocation,
+                kind: hal::image::Kind::D2(WIDTH as hal::image::Size, HEIGHT as hal::image::Size, 1, 1),
                 mip_levels: 1,
                 format: hal::format::Rgba8Srgb::SELF,
                 tiling: hal::image::Tiling::Linear,
@@ -242,9 +269,10 @@ pub fn run_tests(
             "HOST_MAPPED_FOREIGN_MEMORY".into(),
             adapter,
             device,
-            hal::external_memory::ExternalMemoryType::HostMappedForeignMemory.into(),
+
             Parameters::Image {
-                kind: hal::image::Kind::D2(width as hal::image::Size, height as hal::image::Size, 1, 1),
+                external_memory_type: hal::external_memory::ExternalImageMemoryType::HostMappedForeignMemory,
+                kind: hal::image::Kind::D2(WIDTH as hal::image::Size, HEIGHT as hal::image::Size, 1, 1),
                 mip_levels: 1,
                 format: hal::format::Rgba8Srgb::SELF,
                 tiling: hal::image::Tiling::Linear,
@@ -256,16 +284,16 @@ pub fn run_tests(
     );
 }
 
+
+
 pub fn run_test(
     name: String,
 
     adapter: &Adapter<gfx_backend_vulkan::Backend>,
     device: &gfx_backend_vulkan::Device,
 
-    external_memory_type: hal::external_memory::ExternalMemoryType,
     parameters: Parameters,
 ) -> Tests {
-
     let mut tests = Tests {
         name: name,
         create_allocate_external_resource: None,
@@ -274,23 +302,16 @@ pub fn run_test(
         data_check: None,
     };
 
-    let external_memory_properties = match parameters {
-        Parameters::Buffer{buffer_usage,buffer_flags}=>{
-            match adapter
+    let external_memory_properties = match parameters.clone() {
+        Parameters::Buffer{external_memory_type,buffer_usage,buffer_flags}=>{
+            adapter
             .physical_device
-            .query_external_buffer_properties(buffer_usage, buffer_flags, external_memory_type.into())
-            {
-                Ok(external_memory_properties)=>external_memory_properties,
-                Err(err)=>{
-                    error!("Error on `query_external_buffer_properties`: {:#?}",err);
-                    return tests;
-                }
-            }
+            .external_buffer_properties(buffer_usage, buffer_flags, external_memory_type)
         }
-        Parameters::Image{kind: _,mip_levels: _,format,tiling,usage,sparse: _,view_caps}=>{
+        Parameters::Image{external_memory_type, kind: _,mip_levels: _,format,tiling,usage,sparse: _,view_caps}=>{
             match adapter
             .physical_device
-            .query_external_image_properties(format,2,tiling,usage,view_caps, external_memory_type.into())
+            .external_image_properties(format,2,tiling,usage,view_caps, external_memory_type.external_memory_type())
             {
                 Ok(external_memory_properties)=>external_memory_properties,
                 Err(err)=>{
@@ -302,9 +323,6 @@ pub fn run_test(
     };
 
     println!("{:#?}",&external_memory_properties);
-
-
-
 
     let memory_types: u32 = adapter
         .physical_device
@@ -335,538 +353,262 @@ pub fn run_test(
     let padded_buffer_len =
         ((data_len + host_ptr_alignment - 1) / host_ptr_alignment) * host_ptr_alignment;
 
-    match (
-        external_memory_properties.is_exportable(),
-        external_memory_properties.is_importable(),
-        external_memory_properties.is_exportable_from_imported(),
-    ) {
-        (true, false, _) => {
-            let (resource,mut memory): (Resource<gfx_backend_vulkan::Backend>,_) = match parameters {
-                Parameters::Buffer{buffer_usage,buffer_flags}=>{
-                    let (buffer, memory) = match unsafe {
-                        device.create_allocate_external_buffer(
-                            external_memory_type.into(),
-                            buffer_usage,
-                            buffer_flags,
-                            memory_types,
-                            padded_buffer_len,
-                        )
-                    } {
-                        Ok(buffer_memory) => {
-                            tests.create_allocate_external_resource = Some(TestResult::Success);
-                            buffer_memory
-                        }
-                        Err(err) => {
-                            error!("Error on `create_allocate_external_resource`: {:#?}", err);
-                            tests.create_allocate_external_resource = Some(TestResult::Failed);
-                            return tests;
-                        }
-                    };
-                    (Resource::Buffer(buffer),memory)
-                }
-                Parameters::Image{kind,mip_levels,format,tiling,usage,sparse,view_caps}=>{
-                    let (image, memory) = match unsafe {
-                        device.create_allocate_external_image(
-                            external_memory_type.into(),
-                            kind,mip_levels,format,tiling,usage,sparse,view_caps,
-                            memory_types
-                        )
-                    } {
-                        Ok(image_memory) => {
-                            tests.create_allocate_external_resource = Some(TestResult::Success);
-                            image_memory
-                        }
-                        Err(err) => {
-                            error!("Error on `create_allocate_external_resource`: {:#?}", err);
-                            tests.create_allocate_external_resource = Some(TestResult::Failed);
-                            return tests;
-                        }
-                    };
-                    (Resource::Image(image),memory)
-                }
-            };
+    let external_memory_type = match parameters.clone() {
+        Parameters::Image{external_memory_type,..}=>external_memory_type.external_memory_type(),
+        Parameters::Buffer{external_memory_type,..}=>external_memory_type
+    };
 
-            write_memory(device, &mut memory, &data_in);
 
-            let _external_memory = if external_memory_type
-                == hal::external_memory::ExternalMemoryType::HostAllocation
-                || external_memory_type
-                    == hal::external_memory::ExternalMemoryType::HostMappedForeignMemory
-            {
-                match unsafe { device.map_memory(&mut memory, hal::memory::Segment::ALL) } {
-                    Ok(external_memory) => {
-                        tests.export_memory = Some(TestResult::Success);
-                        let ptr: hal::external_memory::Ptr = external_memory.into();
-                        (external_memory_type, ptr).try_into().unwrap()
+    let mut exportable_resource = None;
+    let mut exportable_memory = None;
+    let mut exported_memory = None;
+
+    let mut imported_resource = None;
+    let mut imported_memory = None;
+
+    if external_memory_properties.contains(hal::external_memory::ExternalMemoryProperties::EXPORTABLE){
+        let (resource,mut memory): (Resource<gfx_backend_vulkan::Backend>,_) = match parameters.clone() {
+            Parameters::Buffer{external_memory_type,buffer_usage,buffer_flags}=>{
+                let (buffer, memory) = match unsafe {
+                    device.create_allocate_external_buffer(
+                        external_memory_type,
+                        buffer_usage,
+                        buffer_flags,
+                        memory_types,
+                        padded_buffer_len,
+                    )
+                } {
+                    Ok(buffer_memory) => {
+                        tests.create_allocate_external_resource = Some(TestResult::Success);
+                        buffer_memory
                     }
                     Err(err) => {
-                        error!("Error on `export_memory`: {:#?}", err);
-                        tests.export_memory = Some(TestResult::Failed);
-                        device.wait_idle().unwrap();
-                        unsafe {
-                            match resource {
-                                Resource::Buffer(buffer)=>device.destroy_buffer(buffer),
-                                Resource::Image(image)=>device.destroy_image(image)
-                            }
-                            device.free_memory(memory);
-                        }
+                        error!("Error on `create_allocate_external_resource`: {:#?}", err);
+                        tests.create_allocate_external_resource = Some(TestResult::Failed);
                         return tests;
                     }
-                }
-            } else {
-                match unsafe { device.export_memory(external_memory_type, &memory) } {
-                    Ok(external_memory) => {
-                        tests.export_memory = Some(TestResult::Success);
-                        external_memory
-                    }
-                    Err(err) => {
-                        error!("Error on `export_memory`: {:#?}", err);
-                        tests.export_memory = Some(TestResult::Failed);
-                        device.wait_idle().unwrap();
-                        unsafe {
-                            match resource {
-                                Resource::Buffer(buffer)=>device.destroy_buffer(buffer),
-                                Resource::Image(image)=>device.destroy_image(image)
-                            }
-                            device.free_memory(memory);
-                        }
-                        return tests;
-                    }
-                }
-            };
-            device.wait_idle().unwrap();
-            unsafe {
-                device.wait_idle().unwrap();
-                if external_memory_type == hal::external_memory::ExternalMemoryType::HostAllocation ||
-                external_memory_type == hal::external_memory::ExternalMemoryType::HostMappedForeignMemory {
-                    device.unmap_memory(&mut memory);
-                }
-                match resource {
-                    Resource::Buffer(buffer)=>device.destroy_buffer(buffer),
-                    Resource::Image(image)=>device.destroy_image(image)
-                }
-                device.free_memory(memory);
+                };
+                (Resource::Buffer(buffer),memory)
             }
-        }
-        (true, true, true) => {
-            let (resource,mut memory): (Resource<gfx_backend_vulkan::Backend>,_) = match parameters {
-                Parameters::Buffer{buffer_usage,buffer_flags}=>{
-                    let (buffer, memory) = match unsafe {
-                        device.create_allocate_external_buffer(
-                            external_memory_type.into(),
-                            buffer_usage,
-                            buffer_flags,
-                            memory_types,
-                            padded_buffer_len,
-                        )
-                    } {
-                        Ok(buffer_memory) => {
-                            tests.create_allocate_external_resource = Some(TestResult::Success);
-                            buffer_memory
-                        }
-                        Err(err) => {
-                            error!("Error on `create_allocate_external_resource`: {:#?}", err);
-                            tests.create_allocate_external_resource = Some(TestResult::Failed);
-                            return tests;
-                        }
-                    };
-                    (Resource::Buffer(buffer),memory)
-                }
-                Parameters::Image{kind,mip_levels,format,tiling,usage,sparse,view_caps}=>{
-                    let (image, memory) = match unsafe {
-                        device.create_allocate_external_image(
-                            external_memory_type.into(),
-                            kind,mip_levels,format,tiling,usage,sparse,view_caps,
-                            memory_types
-                        )
-                    } {
-                        Ok(image_memory) => {
-                            tests.create_allocate_external_resource = Some(TestResult::Success);
-                            image_memory
-                        }
-                        Err(err) => {
-                            error!("Error on `create_allocate_external_resource`: {:#?}", err);
-                            tests.create_allocate_external_resource = Some(TestResult::Failed);
-                            return tests;
-                        }
-                    };
-                    (Resource::Image(image),memory)
-                }
-            };
-
-            write_memory(device, &mut memory, &data_in);
-
-            let external_memory = if external_memory_type
-                == hal::external_memory::ExternalMemoryType::HostAllocation
-                || external_memory_type
-                    == hal::external_memory::ExternalMemoryType::HostMappedForeignMemory
-            {
-                match unsafe { device.map_memory(&mut memory, hal::memory::Segment::ALL) } {
-                    Ok(external_memory) => {
-                        tests.export_memory = Some(TestResult::Success);
-                        let ptr: hal::external_memory::Ptr = external_memory.into();
-                        (external_memory_type, ptr).try_into().unwrap()
+            Parameters::Image{external_memory_type,kind,mip_levels,format,tiling,usage,sparse,view_caps}=>{
+                let (image, memory) = match unsafe {
+                    device.create_allocate_external_image(
+                        external_memory_type,
+                        kind,mip_levels,format,tiling,usage,sparse,view_caps,
+                        memory_types
+                    )
+                } {
+                    Ok(image_memory) => {
+                        tests.create_allocate_external_resource = Some(TestResult::Success);
+                        image_memory
                     }
                     Err(err) => {
-                        error!("Error on `export_memory`: {:#?}", err);
-                        tests.export_memory = Some(TestResult::Failed);
-                        device.wait_idle().unwrap();
-                        unsafe {
-                            match resource {
-                                Resource::Buffer(buffer)=>device.destroy_buffer(buffer),
-                                Resource::Image(image)=>device.destroy_image(image)
-                            }
-                            device.free_memory(memory);
-                        }
+                        error!("Error on `create_allocate_external_resource`: {:#?}", err);
+                        tests.create_allocate_external_resource = Some(TestResult::Failed);
                         return tests;
                     }
-                }
-            } else {
-                match unsafe { device.export_memory(external_memory_type, &memory) } {
-                    Ok(external_memory) => {
-                        tests.export_memory = Some(TestResult::Success);
-                        external_memory
-                    }
-                    Err(err) => {
-                        error!("Error on `export_memory`: {:#?}", err);
-                        tests.export_memory = Some(TestResult::Failed);
-                        device.wait_idle().unwrap();
-                        unsafe {
-                        match resource {
-                            Resource::Buffer(buffer)=>device.destroy_buffer(buffer),
-                            Resource::Image(image)=>device.destroy_image(image)
-                        }
-                            device.free_memory(memory);
-                        }
-                        return tests;
-                    }
-                }
-            };
-/*
-            let (imported_buffer, mut imported_memory) = match unsafe {
-                device.import_external_resource(
-                    external_memory,
-                    buffer_usage,
-                    buffer_flags,
-                    memory_types.clone(),
-                    padded_buffer_len,
-                )
-            } {
-                Ok(buffer_memory) => {
-                    tests.import_external_resource = Some(TestResult::Success);
-                    buffer_memory
+                };
+                (Resource::Image(image),memory)
+            }
+        };
+
+        write_memory(device, &mut memory, &data_in);
+
+        let external_memory = if external_memory_type
+            == hal::external_memory::ExternalMemoryType::HostAllocation
+            || external_memory_type
+                == hal::external_memory::ExternalMemoryType::HostMappedForeignMemory
+        {
+            match unsafe { device.map_memory(&mut memory, hal::memory::Segment::ALL) } {
+                Ok(external_memory) => {
+                    tests.export_memory = Some(TestResult::Success);
+                    let ptr: hal::external_memory::Ptr = external_memory.into();
+                    hal::external_memory::PlatformMemory::Ptr(ptr)
                 }
                 Err(err) => {
-                    error!("Error on `import_external_resource`: {:#?}", err);
-                    tests.import_external_resource = Some(TestResult::Failed);
-                    device.wait_idle().unwrap();
-                    unsafe {
-                        if external_memory_type == hal::external_memory::ExternalMemoryType::HostAllocation ||
-                        external_memory_type == hal::external_memory::ExternalMemoryType::HostMappedForeignMemory {
-                            device.unmap_memory(&mut memory);
-                        }
-                        match resource {
-                            Resource::Buffer(buffer)=>device.destroy_buffer(buffer),
-                            Resource::Image(image)=>device.destroy_image(image)
-                        }
-                        device.free_memory(memory);
-                    }
+                    error!("Error on `export_memory`: {:#?}", err);
+                    tests.export_memory = Some(TestResult::Failed);
                     return tests;
                 }
-            };
-*/
-            let (imported_resource,mut imported_memory): (Resource<gfx_backend_vulkan::Backend>,_) = match parameters {
-                Parameters::Buffer{buffer_usage,buffer_flags}=>{
-                    let (buffer, memory) = match unsafe {
-                        device.import_external_buffer(
-                            external_memory,
-                            buffer_usage,
-                            buffer_flags,
-                            memory_types.clone(),
-                            padded_buffer_len,
-                        )
-                    } {
-                        Ok(buffer_memory) => {
-                            tests.import_external_resource = Some(TestResult::Success);
-                            buffer_memory
-                        }
-                        Err(err) => {
-                            error!("Error on `import_external_resource`: {:#?}", err);
-                            tests.import_external_resource = Some(TestResult::Failed);
-                            device.wait_idle().unwrap();
-                            unsafe {
-                                if external_memory_type == hal::external_memory::ExternalMemoryType::HostAllocation ||
-                                external_memory_type == hal::external_memory::ExternalMemoryType::HostMappedForeignMemory {
-                                    device.unmap_memory(&mut memory);
-                                }
-                                match resource {
-                                    Resource::Buffer(buffer)=>device.destroy_buffer(buffer),
-                                    Resource::Image(image)=>device.destroy_image(image)
-                                }
-                                device.free_memory(memory);
-                            }
-                            return tests;
-                        }
-                    };
-                    (Resource::Buffer(buffer),memory)
-                }
-                Parameters::Image{kind,mip_levels,format,tiling,usage,sparse,view_caps}=>{
-                    let (image, memory) = match unsafe {
-                        device.import_external_image(
-                            external_memory,
-                            kind,mip_levels,format,tiling,usage,sparse,view_caps,
-                            memory_types.clone()
-                        )
-                    } {
-                        Ok(image_memory) => {
-                            tests.import_external_resource = Some(TestResult::Success);
-                            image_memory
-                        }
-                        Err(err) => {
-                            error!("Error on `import_external_resource`: {:#?}", err);
-                            tests.import_external_resource = Some(TestResult::Failed);
-                            device.wait_idle().unwrap();
-                            unsafe {
-                                if external_memory_type == hal::external_memory::ExternalMemoryType::HostAllocation ||
-                                external_memory_type == hal::external_memory::ExternalMemoryType::HostMappedForeignMemory {
-                                    device.unmap_memory(&mut memory);
-                                }
-                                match resource {
-                                    Resource::Buffer(buffer)=>device.destroy_buffer(buffer),
-                                    Resource::Image(image)=>device.destroy_image(image)
-                                }
-                                device.free_memory(memory);
-                            }
-                            return tests;
-                        }
-                    };
-                    (Resource::Image(image),memory)
-                }
-            };
-
-            let data_out = read_memory::<crate::DataTest>(device, &mut imported_memory);
-            if data_in == data_out {
-                tests.data_check = Some(TestResult::Success);
-            } else {
-                tests.data_check = Some(TestResult::Failed);
             }
-
-            device.wait_idle().unwrap();
-            unsafe {
-                match imported_resource {
-                    Resource::Buffer(buffer)=>device.destroy_buffer(buffer),
-                    Resource::Image(image)=>device.destroy_image(image)
+        } else {
+            match unsafe { device.export_memory(external_memory_type, &memory) } {
+                Ok(external_memory) => {
+                    tests.export_memory = Some(TestResult::Success);
+                    external_memory
                 }
-                device.free_memory(imported_memory);
-                if external_memory_type == hal::external_memory::ExternalMemoryType::HostAllocation ||
-                external_memory_type == hal::external_memory::ExternalMemoryType::HostMappedForeignMemory {
-                    device.unmap_memory(&mut memory);
+                Err(err) => {
+                    error!("Error on `export_memory`: {:#?}", err);
+                    tests.export_memory = Some(TestResult::Failed);
+                    return tests;
                 }
-                match resource {
-                    Resource::Buffer(buffer)=>device.destroy_buffer(buffer),
-                    Resource::Image(image)=>device.destroy_image(image)
-                }
-                device.free_memory(memory);
             }
-        }
-        (false,true,false)=>{
-            if hal::external_memory::ExternalMemoryType::HostAllocation == external_memory_type
-                || hal::external_memory::ExternalMemoryType::HostMappedForeignMemory
-                    == external_memory_type
-            {
-            } else {
-                return tests;
-            }
+        };
 
-            let (resource,mut memory): (Resource<gfx_backend_vulkan::Backend>,_)= match parameters {
-                Parameters::Buffer{buffer_usage,buffer_flags}=>{
-                    let (buffer, memory) = match unsafe {
-                        device.create_allocate_external_buffer(
-                            external_memory_type.into(),
-                            buffer_usage,
-                            buffer_flags,
-                            memory_types,
-                            padded_buffer_len,
-                        )
-                    } {
-                        Ok(buffer_memory) => {
-                            tests.create_allocate_external_resource = Some(TestResult::Success);
-                            buffer_memory
-                        }
-                        Err(err) => {
-                            error!("Error on `create_allocate_external_resource`: {:#?}", err);
-                            tests.create_allocate_external_resource = Some(TestResult::Failed);
-                            return tests;
-                        }
-                    };
-                    (Resource::Buffer(buffer),memory)
-                }
-                Parameters::Image{kind,mip_levels,format,tiling,usage,sparse,view_caps}=>{
-                    let (image, memory) = match unsafe {
-                        device.create_allocate_external_image(
-                            external_memory_type.into(),
-                            kind,mip_levels,format,tiling,usage,sparse,view_caps,
-                            memory_types
-                        )
-                    } {
-                        Ok(image_memory) => {
-                            tests.create_allocate_external_resource = Some(TestResult::Success);
-                            image_memory
-                        }
-                        Err(err) => {
-                            error!("Error on `create_allocate_external_resource`: {:#?}", err);
-                            tests.create_allocate_external_resource = Some(TestResult::Failed);
-                            return tests;
-                        }
-                    };
-                    (Resource::Image(image),memory)
-                }
-            };
-
-            write_memory(device, &mut memory, &data_in);
-
-            let external_memory = if external_memory_type
-                == hal::external_memory::ExternalMemoryType::HostAllocation
-                || external_memory_type
-                    == hal::external_memory::ExternalMemoryType::HostMappedForeignMemory
-            {
-                match unsafe { device.map_memory(&mut memory, hal::memory::Segment::ALL) } {
-                    Ok(external_memory) => {
-                        tests.export_memory = Some(TestResult::Success);
-                        let ptr: hal::external_memory::Ptr = external_memory.into();
-                        (external_memory_type, ptr).try_into().unwrap()
-                    }
-                    Err(err) => {
-                        error!("Error on `export_memory`: {:#?}", err);
-                        tests.export_memory = Some(TestResult::Failed);
-                        device.wait_idle().unwrap();
-                        unsafe {
-                            match resource {
-                                Resource::Buffer(buffer)=>device.destroy_buffer(buffer),
-                                Resource::Image(image)=>device.destroy_image(image)
-                            }
-                            device.free_memory(memory);
-                        }
-                        return tests;
-                    }
-                }
-            } else {
-                match unsafe { device.export_memory(external_memory_type, &memory) } {
-                    Ok(external_memory) => {
-                        tests.export_memory = Some(TestResult::Success);
-                        external_memory
-                    }
-                    Err(err) => {
-                        error!("Error on `export_memory`: {:#?}", err);
-                        tests.export_memory = Some(TestResult::Failed);
-                        device.wait_idle().unwrap();
-                        unsafe {
-                            match resource {
-                                Resource::Buffer(buffer)=>device.destroy_buffer(buffer),
-                                Resource::Image(image)=>device.destroy_image(image)
-                            }
-                            device.free_memory(memory);
-                        }
-                        return tests;
-                    }
-                }
-            };
-            let (imported_resource,mut imported_memory): (Resource<gfx_backend_vulkan::Backend>,_) = match parameters {
-                Parameters::Buffer{buffer_usage,buffer_flags}=>{
-                    let (buffer, memory) = match unsafe {
-                        device.import_external_buffer(
-                            external_memory,
-                            buffer_usage,
-                            buffer_flags,
-                            memory_types.clone(),
-                            padded_buffer_len,
-                        )
-                    } {
-                        Ok(buffer_memory) => {
-                            tests.import_external_resource = Some(TestResult::Success);
-                            buffer_memory
-                        }
-                        Err(err) => {
-                            error!("Error on `import_external_resource`: {:#?}", err);
-                            tests.import_external_resource = Some(TestResult::Failed);
-                            device.wait_idle().unwrap();
-                            unsafe {
-                                if external_memory_type == hal::external_memory::ExternalMemoryType::HostAllocation ||
-                                external_memory_type == hal::external_memory::ExternalMemoryType::HostMappedForeignMemory {
-                                    device.unmap_memory(&mut memory);
-                                }
-                                match resource {
-                                    Resource::Buffer(buffer)=>device.destroy_buffer(buffer),
-                                    Resource::Image(image)=>device.destroy_image(image)
-                                }
-                                device.free_memory(memory);
-                            }
-                            return tests;
-                        }
-                    };
-                    (Resource::Buffer(buffer),memory)
-                }
-                Parameters::Image{kind,mip_levels,format,tiling,usage,sparse,view_caps}=>{
-                    let (image, memory) = match unsafe {
-                        device.import_external_image(
-                            external_memory,
-                            kind,mip_levels,format,tiling,usage,sparse,view_caps,
-                            memory_types.clone()
-                        )
-                    } {
-                        Ok(image_memory) => {
-                            tests.import_external_resource = Some(TestResult::Success);
-                            image_memory
-                        }
-                        Err(err) => {
-                            error!("Error on `import_external_resource`: {:#?}", err);
-                            tests.import_external_resource = Some(TestResult::Failed);
-                            device.wait_idle().unwrap();
-                            unsafe {
-                                if external_memory_type == hal::external_memory::ExternalMemoryType::HostAllocation ||
-                                external_memory_type == hal::external_memory::ExternalMemoryType::HostMappedForeignMemory {
-                                    device.unmap_memory(&mut memory);
-                                }
-                                match resource {
-                                    Resource::Buffer(buffer)=>device.destroy_buffer(buffer),
-                                    Resource::Image(image)=>device.destroy_image(image)
-                                }
-                                device.free_memory(memory);
-                            }
-                            return tests;
-                        }
-                    };
-                    (Resource::Image(image),memory)
-                }
-            };
-
-            let data_out = read_memory::<crate::DataTest>(device, &mut imported_memory);
-            if data_in == data_out {
-                tests.data_check = Some(TestResult::Success);
-            } else {
-                tests.data_check = Some(TestResult::Failed);
-            }
-
-            device.wait_idle().unwrap();
-            unsafe {
-                match imported_resource {
-                    Resource::Buffer(buffer)=>device.destroy_buffer(buffer),
-                    Resource::Image(image)=>device.destroy_image(image)
-                }
-                device.free_memory(imported_memory);
-                if external_memory_type == hal::external_memory::ExternalMemoryType::HostAllocation ||
-                external_memory_type == hal::external_memory::ExternalMemoryType::HostMappedForeignMemory {
-                    device.unmap_memory(&mut memory);
-                }
-                match resource {
-                    Resource::Buffer(buffer)=>device.destroy_buffer(buffer),
-                    Resource::Image(image)=>device.destroy_image(image)
-                }
-                device.free_memory(memory);
-            }
-
-        }
-        _ => {}
+        exportable_resource = Some(resource);
+        exportable_memory = Some(memory);
+        exported_memory = Some(external_memory);
     }
+
+    if external_memory_properties.contains(hal::external_memory::ExternalMemoryProperties::IMPORTABLE) && exported_memory.is_some() {
+        let exported_memory = exported_memory.unwrap();
+        let (resource,mut memory): (Resource<gfx_backend_vulkan::Backend>,_) = match parameters.clone() {
+            Parameters::Buffer{external_memory_type,buffer_usage,buffer_flags}=>{
+                let external_memory = match external_memory_type {
+                    #[cfg(unix)]
+                    ExternalMemoryType::OpaqueFd => ExternalBufferMemory::OpaqueFd(exported_memory.try_into().unwrap()),
+                    #[cfg(windows)]
+                    ExternalMemoryType::OpaqueWin32 => ExternalBufferMemory::OpaqueWin32(exported_memory.try_into().unwrap()),
+                    #[cfg(windows)]
+                    ExternalMemoryType::OpaqueWin32Kmt => ExternalBufferMemory::OpaqueWin32Kmt(exported_memory.try_into().unwrap()),
+                    #[cfg(windows)]
+                    ExternalMemoryType::D3D11Texture => ExternalBufferMemory::D3D11Texture(exported_memory.try_into().unwrap()),
+                    #[cfg(windows)]
+                    ExternalMemoryType::D3D11TextureKmt => ExternalBufferMemory::D3D11TextureKmt(exported_memory.try_into().unwrap()),
+                    #[cfg(windows)]
+                    ExternalMemoryType::D3D12Heap => ExternalBufferMemory::D3D12Heap(exported_memory.try_into().unwrap()),
+                    #[cfg(windows)]
+                    ExternalMemoryType::D3D12Resource => ExternalBufferMemory::D3D12Resource(exported_memory.try_into().unwrap()),
+                    #[cfg(any(target_os = "linux", target_os = "android", doc))]
+                    ExternalMemoryType::DmaBuf => ExternalBufferMemory::DmaBuf(exported_memory.try_into().unwrap()),
+                    #[cfg(any(target_os = "android", doc))]
+                    ExternalMemoryType::AndroidHardwareBuffer => ExternalBufferMemory::AndroidHardwareBuffer(exported_memory.try_into().unwrap()),
+                    ExternalMemoryType::HostAllocation => ExternalBufferMemory::HostAllocation(exported_memory.try_into().unwrap()),
+                    ExternalMemoryType::HostMappedForeignMemory => ExternalBufferMemory::HostMappedForeignMemory(exported_memory.try_into().unwrap()),
+                };
+
+                let (buffer, memory) = match unsafe {
+                    device.import_external_buffer(
+                        external_memory,
+                        buffer_usage,
+                        buffer_flags,
+                        memory_types.clone(),
+                        padded_buffer_len,
+                    )
+                } {
+                    Ok(buffer_memory) => {
+                        tests.import_external_resource = Some(TestResult::Success);
+                        buffer_memory
+                    }
+                    Err(err) => {
+                        error!("Error on `import_external_resource`: {:#?}", err);
+                        tests.import_external_resource = Some(TestResult::Failed);
+                        return tests;
+                    }
+                };
+                (Resource::Buffer(buffer),memory)
+            }
+            Parameters::Image{external_memory_type,kind,mip_levels,format,tiling,usage,sparse,view_caps}=>{
+                let external_memory = match external_memory_type {
+                    #[cfg(unix)]
+                    ExternalImageMemoryType::OpaqueFd => ExternalImageMemory::OpaqueFd(exported_memory.try_into().unwrap()),
+                    #[cfg(windows)]
+                    ExternalImageMemoryType::OpaqueWin32 => ExternalImageMemory::OpaqueWin32(exported_memory.try_into().unwrap()),
+                    #[cfg(windows)]
+                    ExternalImageMemoryType::OpaqueWin32Kmt => ExternalImageMemory::OpaqueWin32Kmt(exported_memory.try_into().unwrap()),
+                    #[cfg(windows)]
+                    ExternalImageMemoryType::D3D11Texture => ExternalImageMemory::D3D11Texture(exported_memory.try_into().unwrap()),
+                    #[cfg(windows)]
+                    ExternalImageMemoryType::D3D11TextureKmt => ExternalImageMemory::D3D11TextureKmt(exported_memory.try_into().unwrap()),
+                    #[cfg(windows)]
+                    ExternalImageMemoryType::D3D12Heap => ExternalImageMemory::D3D12Heap(exported_memory.try_into().unwrap()),
+                    #[cfg(windows)]
+                    ExternalImageMemoryType::D3D12Resource => ExternalImageMemory::D3D12Resource(exported_memory.try_into().unwrap()),
+                    #[cfg(any(target_os = "linux", target_os = "android", doc))]
+                    ExternalImageMemoryType::DmaBuf(_)=> ExternalImageMemory::DmaBuf(exported_memory.try_into().unwrap(),None),
+                    #[cfg(any(target_os = "android", doc))]
+                    ExternalImageMemoryType::AndroidHardwareBuffer => ExternalImageMemory::AndroidHardwareBuffer(exported_memory.try_into().unwrap()),
+                    ExternalImageMemoryType::HostAllocation => ExternalImageMemory::HostAllocation(exported_memory.try_into().unwrap()),
+                    ExternalImageMemoryType::HostMappedForeignMemory => ExternalImageMemory::HostMappedForeignMemory(exported_memory.try_into().unwrap()),
+                };
+                let (image, memory) = match unsafe {
+                    device.import_external_image(
+                        external_memory,
+                        kind,mip_levels,format,tiling,usage,sparse,view_caps,
+                        memory_types.clone()
+                    )
+                } {
+                    Ok(image_memory) => {
+                        tests.import_external_resource = Some(TestResult::Success);
+                        image_memory
+                    }
+                    Err(err) => {
+                        error!("Error on `import_external_resource`: {:#?}", err);
+                        tests.import_external_resource = Some(TestResult::Failed);
+                        return tests;
+                    }
+                };
+                (Resource::Image(image),memory)
+            }
+        };
+
+        let data_out = read_memory::<crate::DataTest>(device, &mut memory);
+        if data_in == data_out {
+            tests.data_check = Some(TestResult::Success);
+        } else {
+            tests.data_check = Some(TestResult::Failed);
+        }
+
+        imported_resource = Some(resource);
+        imported_memory = Some(memory);
+    }
+
+
+    if external_memory_properties.contains(hal::external_memory::ExternalMemoryProperties::EXPORTABLE_FROM_IMPORTED) && imported_memory.is_some() {
+        if external_memory_type
+            == hal::external_memory::ExternalMemoryType::HostAllocation
+            || external_memory_type
+                == hal::external_memory::ExternalMemoryType::HostMappedForeignMemory
+        {
+            match unsafe { device.map_memory(imported_memory.as_mut().unwrap(), hal::memory::Segment::ALL) } {
+                Ok(_external_memory) => {
+                    tests.export_memory = Some(TestResult::Success);
+                }
+                Err(err) => {
+                    error!("Error on `export_memory`: {:#?}", err);
+                    tests.export_memory = Some(TestResult::Failed);
+                    return tests;
+                }
+            }
+        } else {
+            match unsafe { device.export_memory(external_memory_type, imported_memory.as_ref().unwrap()) } {
+                Ok(_external_memory) => {
+                    tests.export_memory = Some(TestResult::Success);
+                }
+                Err(err) => {
+                    error!("Error on `export_memory`: {:#?}", err);
+                    tests.export_memory = Some(TestResult::Failed);
+                    return tests;
+                }
+            }
+        }
+    }
+
+    device.wait_idle().unwrap();
+
+    unsafe {
+        if let Some(resource) = exportable_resource {
+            match resource {
+                Resource::Buffer(buffer)=>device.destroy_buffer(buffer),
+                Resource::Image(image)=>device.destroy_image(image)
+            }
+        }
+
+        if let Some(memory) = exportable_memory {
+            device.free_memory(memory);
+        }
+
+        if let Some(resource) = imported_resource {
+            match resource {
+                Resource::Buffer(buffer)=>device.destroy_buffer(buffer),
+                Resource::Image(image)=>device.destroy_image(image)
+            }
+        }
+
+        if let Some(memory) = imported_memory {
+            device.free_memory(memory);
+        }
+    }
+
     return tests;
 }

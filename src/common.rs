@@ -1,12 +1,15 @@
 use gfx_hal as hal;
 use hal::device::Device;
 
-pub const width: u32 = 1024;
-pub const height: u32 = 768;
+pub enum Resource<T: gfx_hal::Backend> {
+    Buffer(T::Buffer),
+    Image(T::Image)
+}
 
+#[derive(Clone)]
 pub enum Parameters {
     Image{
-        //data: Vec<u8>,
+        external_memory_type: hal::external_memory::ExternalImageMemoryType,
         kind: hal::image::Kind,
         mip_levels: hal::image::Level,
         format: hal::format::Format,
@@ -16,7 +19,7 @@ pub enum Parameters {
         view_caps: hal::image::ViewCapabilities,
     },
     Buffer{
-        //data: Vec<u8>,
+        external_memory_type: hal::external_memory::ExternalBufferMemoryType,
         buffer_usage: hal::buffer::Usage,
         buffer_flags: hal::memory::SparseFlags
     }
