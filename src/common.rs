@@ -5,6 +5,20 @@ pub enum Resource<T: gfx_hal::Backend> {
     Buffer(T::Buffer),
     Image(T::Image)
 }
+impl<T: gfx_hal::Backend> Resource<T> {
+    pub fn image(&self)->&T::Image {
+        match self {
+            Self::Image(image)=>image,
+            _=>panic!()
+        }
+    }
+    pub fn buffer(&self)->&T::Buffer {
+        match self {
+            Self::Buffer(buffer)=>buffer,
+            _=>panic!()
+        }
+    }
+}
 
 #[derive(Clone)]
 pub enum Parameters {

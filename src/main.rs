@@ -10,8 +10,9 @@ use gfx_hal as hal;
 use hal::adapter::{Adapter, PhysicalDevice};
 use hal::device::Device;
 use hal::Instance;
-use hal::format::AsFormat;
+use hal::format::{AsFormat,DrmModifier,Aspects,ImageFeature};
 use std::convert::TryInto;
+use hal::image::{Subresource,SubresourceFootprint,DrmFormatImageProperties};
 use hal::external_memory::*;
 
 const WIDTH: u32 = 800;
@@ -220,28 +221,29 @@ pub fn run_tests(
             )
         );
 
-        /*
         let format_properties = adapter.physical_device.format_properties(Some(hal::format::Rgba8Srgb::SELF));
-        println!("{:#?}",format_properties);
-        println!(
-            "{:#?}",
-            run_test(
-                "DMA_BUF".into(),
-                adapter,
-                device,
-                Parameters::Image {
-                    external_memory_type: hal::external_memory::ExternalImageMemoryType::DmaBuf(Vec::new()),
-                    kind: hal::image::Kind::D2(width as hal::image::Size, height as hal::image::Size, 1, 1),
-                    mip_levels: 1,
-                    format: hal::format::Rgba8Srgb::SELF,
-                    tiling: hal::image::Tiling::Linear,
-                    usage: hal::image::Usage::TRANSFER_DST | hal::image::Usage::SAMPLED,
-                    sparse: hal::memory::SparseFlags::empty(),
-                    view_caps: hal::image::ViewCapabilities::empty(),
-                }
-            )
-        );
-        */
+        let drm_modifiers: Vec<DrmModifier> = format_properties.drm_format_properties.into_iter().map(|drm_format_properties|drm_format_properties.drm_modifier).collect();
+        if drm_modifiers.len() > 0 {
+            println!(
+                "{:#?}",
+                run_test(
+                    "DMA_BUF with DRM_MODIFIERS".into(),
+                    adapter,
+                    device,
+                    Parameters::Image {
+                        external_memory_type: hal::external_memory::ExternalImageMemoryType::DmaBuf(drm_modifiers),
+                        kind: hal::image::Kind::D2(WIDTH as hal::image::Size, HEIGHT as hal::image::Size, 1, 1),
+                        mip_levels: 1,
+                        format: hal::format::Rgba8Srgb::SELF,
+                        tiling: hal::image::Tiling::Linear,
+                        usage: hal::image::Usage::TRANSFER_DST | hal::image::Usage::SAMPLED,
+                        sparse: hal::memory::SparseFlags::empty(),
+                        view_caps: hal::image::ViewCapabilities::empty(),
+                    }
+                )
+            );
+        }
+
     }
 
     println!(
@@ -515,7 +517,32 @@ pub fn run_test(
                     #[cfg(windows)]
                     ExternalImageMemoryType::D3D12Resource => ExternalImageMemory::D3D12Resource(exported_memory.try_into().unwrap()),
                     #[cfg(any(target_os = "linux", target_os = "android", doc))]
-                    ExternalImageMemoryType::DmaBuf(_)=> ExternalImageMemory::DmaBuf(exported_memory.try_into().unwrap(),None),
+                    ExternalImageMemoryType::DmaBuf(drm_modifiers)=> {
+                        let drm_properties = if drm_modifiers.is_empty(){None}
+                        else {
+                            let format_properties = adapter.physical_device.format_properties(Some(format));
+                            let selected_format_properties = match format_properties.drm_format_properties.iter().find(|drm_format_properties|{
+                                drm_format_properties.valid_usages.contains(ImageFeature::COLOR_ATTACHMENT)
+                            }){
+                                Some(format)=>format,
+                                None=>{error!("Failed to find a drm format that support ImageFeature::COLOR_ATTACHMENT");return tests;}
+                            };
+
+                            let subresource_footprints = (0..selected_format_properties.plane_count).into_iter().map(|_|{
+                                let subresource = Subresource {
+                                    aspects: Aspects::COLOR,
+                                    level: 0,
+                                    layer: 0
+                                };
+                                unsafe{device.get_image_subresource_footprint(exportable_resource.as_ref().unwrap().image(),subresource)}
+                            }).collect();
+                            Some(DrmFormatImageProperties {
+                                drm_modifier: selected_format_properties.drm_modifier,
+                                plane_layouts: subresource_footprints
+                            })
+                        };
+                        ExternalImageMemory::DmaBuf(exported_memory.try_into().unwrap(),drm_properties)
+                    },
                     #[cfg(any(target_os = "android", doc))]
                     ExternalImageMemoryType::AndroidHardwareBuffer => ExternalImageMemory::AndroidHardwareBuffer(exported_memory.try_into().unwrap()),
                     ExternalImageMemoryType::HostAllocation => ExternalImageMemory::HostAllocation(exported_memory.try_into().unwrap()),
